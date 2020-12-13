@@ -17,9 +17,11 @@ type
     facing: Direction
     posx: int
     posy: int
+    wpx: int
+    wpy: int
 
 func initShip(): Ship =
-  (east, 0, 0)
+  (east, 0, 0, 10, 1)
 
 func parseInstruction(instruction: string): Instruction =
   let
@@ -81,14 +83,35 @@ func move(ship: Ship, instruction: Instruction): Ship =
     of west:
       result.posx -= instruction.count
 
-func manhattanDist(ship: Ship): int =
-  # Assume the ship origin is fixed at (0, 0).
+func moveWaypoint(ship: Ship, instruction: Instruction): Ship =
+  result = ship.deepCopy
+  case instruction.motion
+  of moveNorth:
+    result.wpy += instruction.count
+  of moveSouth:
+    result.wpy -= instruction.count
+  of moveEast:
+    result.wpx += instruction.count
+  of moveWest:
+    result.wpx -= instruction.count
+  of rotLeft:
+    discard
+  of rotRight:
+    discard
+  of goForward:
+    discard
+
+func manhattanDistZero(ship: Ship): int =
+  ## Assume the ship origin is fixed at (0, 0).
   ship.posx.abs + ship.posy.abs
 
-func followInstructions(ship: Ship, instructions: openArray[Instruction]): Ship =
+func followInstructions(
+  ship: Ship, instructions: openArray[Instruction], waypoint: bool
+): Ship =
   result = ship.deepCopy
+  let mover = if waypoint: moveWaypoint else: move
   for instruction in instructions:
-    result = result.move(instruction)
+    result = result.mover(instruction)
 
 suite "day12":
   let example = """
@@ -113,17 +136,26 @@ F11""".splitlines.mapIt(it.parseInstruction)
     check: north.rotate(rotRight, 0) == north
     let ship0 = initShip()
     let ship1 = ship0.move(example[0])
-    check: ship1 == (east, 10, 0)
+    check: ship1 == (east, 10, 0, 10, 1)
     let ship2 = ship1.move(example[1])
-    check: ship2 == (east, 10, 3)
+    check: ship2 == (east, 10, 3, 10, 1)
     let ship3 = ship2.move(example[2])
-    check: ship3 == (east, 17, 3)
+    check: ship3 == (east, 17, 3, 10, 1)
     let ship4 = ship3.move(example[3])
-    check: ship4 == (south, 17, 3)
+    check: ship4 == (south, 17, 3, 10, 1)
     let ship5 = ship4.move(example[4])
-    check: ship5 == (south, 17, -8)
-    check: ship5.manhattanDist == 25
+    check: ship5 == (south, 17, -8, 10, 1)
+    check: ship5.manhattanDistZero == 25
+  test "part 2":
+    let ship0 = initShip()
+    let ship1 = ship0.moveWaypoint(example[0])
+    let ship2 = ship1.moveWaypoint(example[1])
+    let ship3 = ship2.moveWaypoint(example[2])
+    let ship4 = ship3.moveWaypoint(example[3])
+    let ship5 = ship4.moveWaypoint(example[4])
+    
 
 when isMainModule:
   let input = "day12_input.txt".readAllLines.mapIt(it.parseInstruction)
-  echo "part 1: ", initShip().followInstructions(input).manhattanDist
+  echo "part 1: ", initShip().followInstructions(input, false).manhattanDistZero
+  # echo "part 2: ", initShip().followInstructions(input, true).manhattanDistWaypoint
