@@ -1,3 +1,4 @@
+import lenientops
 import math
 import sequtils
 import strutils
@@ -13,15 +14,16 @@ type
     count: int
   Direction = enum
     north, south, east, west
+  Point = tuple
+    x: int
+    y: int
   Ship = tuple
     facing: Direction
-    posx: int
-    posy: int
-    wpx: int
-    wpy: int
+    pos: Point
+    wp: Point
 
 func initShip(): Ship =
-  (east, 0, 0, 10, 1)
+  (east, (0, 0), (10, 1))
 
 func parseInstruction(instruction: string): Instruction =
   let
@@ -56,17 +58,34 @@ func rotate(compass: Direction, rotation: Motion, degrees: int): Direction =
                else: raise
   invertedDirections[newIndex]
 
+func rotatePoint(point: Point; degrees: int): Point =
+  ## for a point (x, y), rotating it theta degrees gives
+  ##  x' = x * cos(theta) - y * sin(theta)
+  ##  y' = x * sin(theta) + y * cos(theta)
+  ## where theta is positive for CCW/left and negative for CW/right.
+  # let theta = degrees.float.degToRad
+  # (x: int(point.x * theta.cos - point.y * theta.sin),
+  #  y: int(point.x * theta.sin + point.y * theta.cos))
+  case degrees
+  of 90: (-point.y, point.x)
+  of 180: (-point.x, -point.y)
+  of 270: (point.y, -point.x)
+  of -90: (point.y, -point.x)
+  of -180: (-point.x, -point.y)
+  of -270: (-point.y, point.x)
+  else: raise
+
 func move(ship: Ship, instruction: Instruction): Ship =
   result = ship.deepCopy
   case instruction.motion
   of moveNorth:
-    result.posy += instruction.count
+    result.pos.y += instruction.count
   of moveSouth:
-    result.posy -= instruction.count
+    result.pos.y -= instruction.count
   of moveEast:
-    result.posx += instruction.count
+    result.pos.x += instruction.count
   of moveWest:
-    result.posx -= instruction.count
+    result.pos.x -= instruction.count
   of rotLeft:
     result.facing = result.facing.rotate(rotLeft, instruction.count)
   of rotRight:
@@ -75,35 +94,36 @@ func move(ship: Ship, instruction: Instruction): Ship =
   of goForward:
     case ship.facing
     of north:
-      result.posy += instruction.count
+      result.pos.y += instruction.count
     of south:
-      result.posy -= instruction.count
+      result.pos.y -= instruction.count
     of east:
-      result.posx += instruction.count
+      result.pos.x += instruction.count
     of west:
-      result.posx -= instruction.count
+      result.pos.x -= instruction.count
 
 func moveWaypoint(ship: Ship, instruction: Instruction): Ship =
   result = ship.deepCopy
   case instruction.motion
   of moveNorth:
-    result.wpy += instruction.count
+    result.wp.y += instruction.count
   of moveSouth:
-    result.wpy -= instruction.count
+    result.wp.y -= instruction.count
   of moveEast:
-    result.wpx += instruction.count
+    result.wp.x += instruction.count
   of moveWest:
-    result.wpx -= instruction.count
+    result.wp.x -= instruction.count
   of rotLeft:
-    discard
+    result.wp = result.wp.rotatePoint(instruction.count)
   of rotRight:
-    discard
+    result.wp = result.wp.rotatePoint(-instruction.count)
   of goForward:
-    discard
+    result.pos.x += (result.wp.x * instruction.count)
+    result.pos.y += (result.wp.y * instruction.count)
 
-func manhattanDistZero(ship: Ship): int =
-  ## Assume the ship origin is fixed at (0, 0).
-  ship.posx.abs + ship.posy.abs
+func manhattanDist(point: Point): int =
+  ## Assume the origin is fixed at (0, 0).
+  point.x.abs + point.y.abs
 
 func followInstructions(
   ship: Ship, instructions: openArray[Instruction], waypoint: bool
@@ -136,26 +156,32 @@ F11""".splitlines.mapIt(it.parseInstruction)
     check: north.rotate(rotRight, 0) == north
     let ship0 = initShip()
     let ship1 = ship0.move(example[0])
-    check: ship1 == (east, 10, 0, 10, 1)
+    check: ship1 == (east, (10, 0), (10, 1))
     let ship2 = ship1.move(example[1])
-    check: ship2 == (east, 10, 3, 10, 1)
+    check: ship2 == (east, (10, 3), (10, 1))
     let ship3 = ship2.move(example[2])
-    check: ship3 == (east, 17, 3, 10, 1)
+    check: ship3 == (east, (17, 3), (10, 1))
     let ship4 = ship3.move(example[3])
-    check: ship4 == (south, 17, 3, 10, 1)
+    check: ship4 == (south, (17, 3), (10, 1))
     let ship5 = ship4.move(example[4])
-    check: ship5 == (south, 17, -8, 10, 1)
-    check: ship5.manhattanDistZero == 25
+    check: ship5 == (south, (17, -8), (10, 1))
+    check: ship5.pos.manhattanDist == 25
   test "part 2":
+    check: (10, 4).rotatePoint(-90) == (4, -10)
     let ship0 = initShip()
     let ship1 = ship0.moveWaypoint(example[0])
+    check: ship1 == (east, (100, 10), (10, 1))
     let ship2 = ship1.moveWaypoint(example[1])
+    check: ship2 == (east, (100, 10), (10, 4))
     let ship3 = ship2.moveWaypoint(example[2])
+    check: ship3 == (east, (170, 38), (10, 4))
     let ship4 = ship3.moveWaypoint(example[3])
+    check: ship4 == (east, (170, 38), (4, -10))
     let ship5 = ship4.moveWaypoint(example[4])
-    
+    check: ship5 == (east, (214, -72), (4, -10))
+    check: ship5.pos.manhattanDist == 286
 
 when isMainModule:
   let input = "day12_input.txt".readAllLines.mapIt(it.parseInstruction)
-  echo "part 1: ", initShip().followInstructions(input, false).manhattanDistZero
-  # echo "part 2: ", initShip().followInstructions(input, true).manhattanDistWaypoint
+  echo "part 1: ", initShip().followInstructions(input, false).pos.manhattanDist
+  echo "part 2: ", initShip().followInstructions(input, true).pos.manhattanDist
