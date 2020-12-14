@@ -27,18 +27,26 @@ func findClosest(schedule: seq[int]; time: int): int =
   shortestTime * timeToRoute[shortestTime]
 
 proc part2[T: SomeInteger](schedule: seq[T]): T =
+  # this function shamelessly stolen from PMunch
+  var deltaBuses: seq[tuple[index: int, bus: int]]
+  for i, bus in schedule:
+    if bus != freeSpot:
+      deltaBuses.add (i, bus)
   var
-    offsetToRoute: Table[T, T]
-  for offset, route in schedule:
-    if route != freeSpot:
-      offsetToRoute[offset] = route
-  let stepDistance = offsetToRoute[0]
-  for i in countup(0, T.high, stepDistance):
-    var mods: seq[T]
-    for offset, route in offsetToRoute.pairs:
-      mods.add((i + offset) mod route)
-    if mods.foldl(a + b) == 0:
-      return i
+    index: T
+    bus: T
+    start = 0
+    currentBus = 1
+    stepDistance = deltaBuses[0].bus
+  while currentBus < deltaBuses.len:
+    (index, bus) = deltaBuses[currentBus]
+    for i in countup(start, T.high, stepDistance):
+      if (i + index) mod bus == 0:
+        stepDistance *= bus
+        inc currentBus
+        start = i
+        break
+  start
 
 suite "day13":
   test "part 1":
