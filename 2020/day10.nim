@@ -102,6 +102,17 @@ proc getUnorderedDifferences(adapters: seq[int]): seq[(int, int)] =
   # echo legalPairs.toGraph
   legalPairs
 
+# Taken from
+# https://github.com/PMunch/aoc2020/blob/074540fbf82e928e7a543183ed4e23501a780c96/day10/part2.nim
+func waysToReach(adapters: seq[int]): int =
+  var
+    adapters = adapters.sorted
+    tbl = [0].toCountTable
+  adapters.add adapters[^1] + 3
+  for adapter in adapters:
+    tbl[adapter] = tbl[adapter - 3] + tbl[adapter - 2] + tbl[adapter - 1]
+  tbl[adapters[^1]]
+
 suite "day10":
   let
     adapters1 = @[16, 10, 15, 5, 1, 11, 7, 19, 6, 12, 4]
@@ -112,11 +123,11 @@ suite "day10":
     check: adapters2.getDifferences == {1: 22, 3: 10}.toTable
     check: adapters1.getResult == 35
     check: adapters2.getResult == 220
-  # test "part 2":
-  #   echo adapters1.getUnorderedDifferences.sorted
-
+  test "part 2":
+    check: adapters1.waysToReach == 8
+    check: adapters2.waysToReach == 19208
 
 when isMainModule:
   let input = "day10_input.txt".readAllLines.mapIt(it.parseInt)
   echo "part 1: ", input.getResult
-  echo "part 2: "
+  echo "part 2: ", input.waysToReach
