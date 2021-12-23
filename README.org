@@ -1,0 +1,7 @@
+* Advent of Code solutions
+
+| year | language   |
+|------+------------|
+| 2019 | Nim        |
+| 2020 | Nim        |
+| 2021 | Emacs Lisp |
