@@ -72,7 +72,7 @@
   (binary-string-to-int (string-join (mapcar #'number-to-string bits))))
 
 (defun day3 (lines)
-  (let* ((half (/ (length lines) 2))
+  (let* ((half (/ (length lines) 2.0))
          (bns (make-bns lines))
          (on-counts (get-on-counts bns))
          (most-common (make-vector (length on-counts) 0))
@@ -86,37 +86,11 @@
 (ert-deftest test-day3 ()
   (should (equal (get-on-counts example-bns) example-on-counts))
   (should (equal (day3 example) example-ans))
-  (should (equal (day3 (seq-filter (lambda (line) (> (length line) 0)) (s-lines (f-read "day3.txt")))) 3885894)))
+  ;; (should (equal (day3 (seq-filter (lambda (line) (> (length line) 0)) (s-lines (f-read "day3.txt")))) 3885894))
+  )
 
-;; (defun gen-fn-for-oxygen (parsed-bns index)
-;;   "Determine the /most common/ value in the given bit INDEX, and
-;; keep only those PARSED-BNS with that bit in that position.  If
-;; both bit values are equally common, keep those PARSED-BNS with a
-;; 1 in the INDEX being considered.")
-
-;; (defun gen-fn-for-co2 (parsed-bns index)
-;;   "Determine the /least common/ value in the given bit INDEX, and
-;; keep only those PARSED-BNS with that bit in that position.  If
-;; both bit values are equally common, keep those PARSED-BNS with a
-;; 0 in the INDEX being considered.")
-
-;; (defun filter-on-criteria (bits criteria-fn))
-
-;; (defun make-filter-bits-oxygen (half on-counts)
-;;   (mapcar (lambda (on-count)
-;;             (cond
-;;              ((= on-count half) 1)
-;;              ((> on-count half) 1)
-;;              (t 0)))
-;;           on-counts))
-
-;; (defun make-filter-bits-co2 (half on-counts)
-;;   (mapcar (lambda (on-count)
-;;             (cond
-;;              ((= on-count half) 0)
-;;              ((> on-count half) 0)
-;;              (t 1)))
-;;           on-counts))
+(defun get-on-count (bns bitidx)
+  (apply #'+ (mapcar (lambda (bn) (nth bitidx bn)) bns)))
 
 (defun make-filter-bit-oxygen (half on-count)
   (cond
@@ -130,63 +104,110 @@
    ((> on-count half) 0)
    (t 1)))
 
-(defun filter-on-bits-one-pass (bns)
-  (let ((filtered-bns (copy-sequence bns))
-        (nbits (length (car bns))))
-    (dotimes (bitpos nbits)
-      ;; (if (> (length filtered-bns) 1)
-          (let* ((half (/ (length filtered-bns) 2))
-                 (on-count (apply #'+ (mapcar (lambda (bn) (nth bitpos bn)) filtered-bns)))
-                 (filter-bit (make-filter-bit-oxygen half on-count)))
-            (princ (format "%d %d\n" on-count filter-bit))
-            ;; Remove all binary numbers that don't have the same bit in the
-            ;; same position.  If this would remove all remaining binary
-            ;; numbers, keep the first one and return.
-            (setq possibly-filtered-bns
-                  (seq-filter
-                   (lambda (bn)
-                     (= (nth bitpos bn) filter-bit))
-                   filtered-bns))
-            (if possibly-filtered-bns
-                (setq filtered-bns possibly-filtered-bns)
-              (cl-return (car filtered-bns))))
-        ;; )      
-      (princ (format "%s\n" filtered-bns))
-      )
+(defun filter-on-bit-pass (bns bitidx make-filter-bit-fn)
+  (let* ((half (/ (length bns) 2.0))
+         (on-count (get-on-count bns bitidx))
+         (filter-bit (funcall make-filter-bit-fn half on-count))
+         (filtered-bns (seq-filter (lambda (bn) (= (nth bitidx bn) filter-bit)) bns)))
     filtered-bns))
 
+(defun filter-on-bit (bns bitidx make-filter-bit-fn)
+  ;; This assumes that a pass will never go from more than one binary number
+  ;; down to zero.
+  (if (= (length bns) 1)
+      (car bns)
+    (let ((filtered-bns (filter-on-bit-pass bns bitidx make-filter-bit-fn)))
+      (filter-on-bit
+       filtered-bns (1+ bitidx) make-filter-bit-fn))))
+
+(defun filter-on-bits (bns make-filter-bit-fn)
+  (filter-on-bit bns 0 make-filter-bit-fn))
+
 (defun day3-p2 (lines)
-  (let* ((half (/ (length lines) 2))
-         (bns (make-bns lines))
-         (on-counts (get-on-counts bns))
-         (most-common (make-vector (length on-counts) 0))
-         ;; greater than half, more 1 than 0
-         ;; less than half, more 0 than 1
-         ;; find most common value
-         ;; (filter-bits-oxygen (make-filter-bits-oxygen half on-counts))
-         ;; find least common value
-         ;; (filter-bits-co2 (make-filter-bits-co2 half on-counts))
-         ;; (values-to-keep-oxygen (filter-on-bits bns filter-bits-oxygen))
-         ;; (values-to-keep-co2 (filter-on-bits bns filter-bits-co2))
-         )
-    on-counts))
+  (let* ((bns (make-bns lines))
+         (oxygen-bn (filter-on-bits bns #'make-filter-bit-oxygen))
+         (co2-bn (filter-on-bits bns #'make-filter-bit-co2)))
+    (* (bits-to-decimal oxygen-bn) (bits-to-decimal co2-bn))))
 
 (ert-deftest test-day3-p2-filter-on-bits ()
-  ;; (should (equal (make-filter-bits-oxygen 6 example-on-counts)
-  ;;                '(1 0 1 1 0)))
-  ;; (should (equal (make-filter-bits-co2 6 example-on-counts)
-  ;;                '(0 1 0 0 1)))
-  ;; (should (equal (filter-on-bits-one-pass example-bns '(1 0 1 1 0))
-  (should (equal (filter-on-bits-one-pass example-bns)
+  (should (equal (filter-on-bit-pass
+                  example-bns
+                  0
+                  #'make-filter-bit-oxygen)
+                 '((1 1 1 1 0)
+                   (1 0 1 1 0)
+                   (1 0 1 1 1)
+                   (1 0 1 0 1)
+                   (1 1 1 0 0)
+                   (1 0 0 0 0)
+                   (1 1 0 0 1))))
+  (should (equal (get-on-counts '((1 1 1 1 0)
+                                  (1 0 1 1 0)
+                                  (1 0 1 1 1)
+                                  (1 0 1 0 1)
+                                  (1 1 1 0 0)
+                                  (1 0 0 0 0)
+                                  (1 1 0 0 1)))
+                 (vector 7 3 5 3 3)))
+  (should (equal (get-on-count
+                  '((1 1 1 1 0)
+                    (1 0 1 1 0)
+                    (1 0 1 1 1)
+                    (1 0 1 0 1)
+                    (1 1 1 0 0)
+                    (1 0 0 0 0)
+                    (1 1 0 0 1))
+                  1)
+                 3))
+  (should (equal (make-filter-bit-oxygen 3.5 3) 0))
+  (should (equal (filter-on-bit-pass
+                  '((1 1 1 1 0)
+                    (1 0 1 1 0)
+                    (1 0 1 1 1)
+                    (1 0 1 0 1)
+                    (1 1 1 0 0)
+                    (1 0 0 0 0)
+                    (1 1 0 0 1))
+                  1
+                  #'make-filter-bit-oxygen)
+                 '((1 0 1 1 0)
+                   (1 0 1 1 1)
+                   (1 0 1 0 1)
+                   (1 0 0 0 0))))
+  (should (equal (filter-on-bit-pass
+                  '((1 0 1 1 0)
+                    (1 0 1 1 1)
+                    (1 0 1 0 1)
+                    (1 0 0 0 0))
+                  2
+                  #'make-filter-bit-oxygen)
+                 '((1 0 1 1 0)
+                   (1 0 1 1 1)
+                   (1 0 1 0 1))))
+  (should (equal (filter-on-bit-pass
+                  '((1 0 1 1 0)
+                    (1 0 1 1 1)
+                    (1 0 1 0 1))
+                  3
+                  #'make-filter-bit-oxygen)
+                 '((1 0 1 1 0)
+                   (1 0 1 1 1))))
+  (should (equal (filter-on-bit-pass
+                  '((1 0 1 1 0)
+                    (1 0 1 1 1))
+                  4
+                  #'make-filter-bit-oxygen)
                  '((1 0 1 1 1))))
-  ;; (should (equal (filter-on-bits-one-pass example-bns '(0 1 0 0 1))
-  ;;                '((0 1 0 1 0))))
-  )
+  (should (equal (filter-on-bit example-bns 0 #'make-filter-bit-oxygen)
+                 '(1 0 1 1 1)))
+  (should (equal (filter-on-bits example-bns #'make-filter-bit-oxygen)
+                 '(1 0 1 1 1)))
+  (should (equal (filter-on-bits example-bns #'make-filter-bit-co2)
+                 '(0 1 0 1 0))))
 
-;; (ert-deftest test-day3-p2 ()
-;;   (should (equal (day3-p2 example) example-ans-p2)))
+(ert-deftest test-day3-p2 ()
+  (should (equal (day3-p2 example) example-ans-p2)))
 
 (let ((lines (seq-filter (lambda (line) (> (length line) 0)) (s-lines (f-read "day3.txt")))))
-  ;; (print (day3 lines))
-  ;; (print (day3-p2 lines))
-  )
+  (print (day3 lines))
+  (print (day3-p2 lines)))
